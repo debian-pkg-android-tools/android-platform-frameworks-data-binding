@@ -1,0 +1,12 @@
+RuleVersion.java in debian/antlr4 comes from [1] which is a feature request for
+ANTLR but not yet merged to upstream.
+
+Nullable.java in debian/antlr4 comes from [2] which is a fork of ANTLR by Tunnel
+Vision Laboratories.
+
+This two classes are authored by the same people and are used by Android. Sadly
+they are not in upstream ANTLR, that's why we need to include it into this
+package.
+
+[1]: https://github.com/antlr/antlr4/issues/35
+[2]: https://github.com/tunnelvisionlabs/antlr4/blob/master/runtime/JavaAnnotations/src/org/antlr/v4/runtime/misc/Nullable.java

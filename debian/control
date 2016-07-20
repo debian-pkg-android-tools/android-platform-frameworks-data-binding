@@ -1,0 +1,34 @@
+Source: android-platform-frameworks-data-binding
+Section: java
+Priority: optional
+Maintainer: Android Tools Maintainers <android-tools-devel@lists.alioth.debian.org>
+Uploaders: Kai-Chung Yan <seamlikok@gmail.com>
+Build-Depends: antlr4,
+               debhelper (>=9),
+               default-jdk-headless | default-jdk (>= 1:1.6),
+               gradle-debian-helper,
+               libcommons-io-java,
+               libguava-java,
+               libjuniversalchardet-java
+Standards-Version: 3.9.8
+Homepage: https://android.googlesource.com/platform/frameworks/data-binding
+Vcs-Git: https://anonscm.debian.org/git/android-tools/android-platform-frameworks-data-binding.git
+Vcs-Browser: https://anonscm.debian.org/cgit/android-tools/android-platform-frameworks-data-binding.git
+
+Package: libandroid-databinding-java
+Architecture: all
+Depends: antlr4,
+         libcommons-io-java,
+         libguava-java,
+         libjuniversalchardet-java,
+         ${misc:Depends}
+Description: Android Data Binding Library
+ The Data Binding Library enables Android application developers to write
+ declarative layouts and minimize the glue code necessary to bind application
+ logic and layouts. 
+ .
+ This package contains the following libraries which are for building and being
+ used by Android SDK:
+   * baseLibrary: Shared library between Data Binding runtime lib and compiler
+   * compilerCommon: Common library that can be shared between different build
+     tools

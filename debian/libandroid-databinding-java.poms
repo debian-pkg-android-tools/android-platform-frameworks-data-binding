@@ -1,0 +1,2 @@
+baseLibrary/build/baseLibrary.pom --artifact=baseLibrary/build/libs/*.jar --java-lib --usj-name=com.android.databinding.baseLibrary
+compilerCommon/build/compilerCommon.pom --artifact=compilerCommon/build/libs/*.jar --java-lib --usj-name=com.android.databinding.compilerCommon

@@ -1,0 +1,192 @@
+Author: Kai-Chung Yan <seamlikok@gmail.com>
+Last-Update: 2016-07-20
+Description: Prepare build scripts
+ This patch modifies the build scripts so that the projects can be built for
+ Debian. It does the following:
+   * Exclude unused projects
+   * Removed unused tasks
+   * Use local artifacts to build
+--- a/build.gradle
++++ b/build.gradle
+@@ -3,41 +3,22 @@
+ buildscript {
+     ext.dataBindingRootFolder = project.projectDir
+     apply from: 'propLoader.gradle'
+-    ext.addRepos(repositories)
+-    if (ext.dataBindingConfig.addRemoteRepos) {
+-        dependencies {
+-            classpath "com.android.databinding:localizemaven:${dataBindingConfig.extraPluginsVersion}"
+-        }
+-    }
+     dependencies {
+         classpath 'net.sf.proguard:proguard-gradle:5.2.1'
+     }
+ }
+ 
+ subprojects {
+-    if (dataBindingConfig.isIndependent) {
+-        apply plugin: 'maven'
+-        if (dataBindingConfig.addRemoteRepos && !dataBindingConfig.forGradlePlugin) {
+-            apply plugin: 'com.android.databinding.localizemaven'
+-        }
+-    } else {
+-        apply from: "${project.projectDir}/../../buildSrc/base/baseJava.gradle"
++    if (it.subprojects.isEmpty()) {
++        apply from: "${rootDir}/debian/generatePom.gradle"
++    }
++    repositories {
++        maven { url 'file:///usr/share/maven-repo' }
+     }
+ 
+     if (it.name != "compilationTests") {
+         group = dataBindingConfig.group
+         version = dataBindingConfig.version
+-        uploadArchives {
+-            repositories {
+-                mavenDeployer {
+-                    repository(url: "file://${dataBindingConfig.mavenRepoDir}")
+-                }
+-            }
+-        }
+-    }
+-
+-    buildscript {
+-        addRepos(repositories)
+     }
+ 
+ }
+@@ -69,7 +50,6 @@
+         "-PuseReleaseVersion=${dataBindingConfig.inReleaseBuild ? 'true' : 'false'}",
+         "-PaddRemoteRepos=${dataBindingConfig.addRemoteRepos ? 'true' : 'false'}",
+         "-PforGradlePlugin=${dataBindingConfig.forGradlePlugin ? 'true' : 'false'}"
+-buildExtensionsTask.dependsOn subprojects.uploadArchives
+ 
+ def prepareExtensionPrebuilds = project.tasks.create "prepareExtensionPrebuilds", Exec
+ prepareExtensionPrebuilds.workingDir file('extensions').getAbsolutePath()
+@@ -78,7 +58,6 @@
+         "-PuseReleaseVersion=${dataBindingConfig.inReleaseBuild ? 'true' : 'false'}",
+         "-PaddRemoteRepos=${dataBindingConfig.addRemoteRepos ? 'true' : 'false'}",
+         "-PforGradlePlugin=${dataBindingConfig.forGradlePlugin ? 'true' : 'false'}"
+-prepareExtensionPrebuilds.dependsOn subprojects.uploadArchives
+ 
+ file('integration-tests').listFiles().findAll { it.isDirectory() }.each {
+     println("Creating run test task for  ${it.getAbsolutePath()}.")
+@@ -90,7 +69,6 @@
+             "-PuseReleaseVersion=${dataBindingConfig.inReleaseBuild ? 'true' : 'false'}",
+             "-PaddRemoteRepos=${dataBindingConfig.addRemoteRepos ? 'true' : 'false'}",
+             "-PforGradlePlugin=${dataBindingConfig.forGradlePlugin ? 'true' : 'false'}"
+-    testTask.dependsOn subprojects.uploadArchives
+ }
+ 
+ task runIntegrationTests {
+@@ -114,16 +92,12 @@
+     }
+ }
+ 
+-subprojects.uploadArchives.each { it.shouldRunAfter deleteRepo  }
+-subprojects.uploadArchives.each { it.shouldRunAfter deletePrebuildFolder  }
+-
+ buildExtensionsTask.shouldRunAfter deleteRepo
+ tasks['runTestsOfMultiModuleTestApp'].dependsOn tasks['runTestsOfIndependentLibrary']
+ 
+ 
+ task rebuildRepo() {
+     dependsOn deleteRepo
+-    dependsOn subprojects.uploadArchives
+ }
+ 
+ task copySamplesToEap(type : Copy) {
+--- a/propLoader.gradle
++++ b/propLoader.gradle
+@@ -6,7 +6,7 @@
+ databindingProperties.load(new FileInputStream("${root}/databinding.properties"))
+ 
+ // load android gradle plugin's version file
+-apply from: "${root}/../buildSrc/base/version.gradle"
++apply from: 'debian/version.gradle'
+ 
+ databindingProperties.version = ext.buildVersion
+ databindingProperties.compileSdkVersion = Integer.parseInt(databindingProperties.compileSdkVersionStr)
+@@ -18,7 +18,6 @@
+ 
+ databindingProperties.inReleaseBuild = project.ext.hasProperty('release') && project.ext.release
+ // load version from gradle build file
+-apply from: "$root/../buildSrc/base/version.gradle"
+ databindingProperties.androidPluginVersion=ext.buildVersion
+ databindingProperties.isIndependent = rootProject.name.equals("data-binding")
+ databindingProperties.eapOutDir = "${root}/${databindingProperties.eapOutFolderName}"
+@@ -29,9 +28,6 @@
+ ext.dataBindingConfig.externalPrebuiltsBase = "${root}/../../prebuilts"
+ databindingProperties.megaRepoDir = "${databindingProperties.externalPrebuiltsBase}/tools/common/m2/repository"
+ 
+-new File(ext.dataBindingConfig.mavenRepoDir).mkdir()
+-new File(ext.dataBindingConfig.prebuildFolder).mkdir()
+-
+ def addRemoteRepos = project.hasProperty('addRemoteRepos') && project.getProperty('addRemoteRepos').equals("true")
+ ext.dataBindingConfig.addRemoteRepos = addRemoteRepos
+ ext.dataBindingConfig.sharedSupportRepoDir = "${ext.dataBindingConfig.externalPrebuiltsBase}/maven_repo/android"
+@@ -58,14 +54,6 @@
+     }
+ }
+ ext.addRepos = this.&addRepos
+-subprojects {
+-    buildscript {
+-        addRepos(repositories)
+-    }
+-    repositories {
+-        addRepos(repositories)
+-    }
+-}
+ 
+ def enablePublishing(p, addJavadoc) {
+     if (!ext.dataBindingConfig.isIndependent) {
+--- a/settings.gradle
++++ b/settings.gradle
+@@ -1,9 +1,5 @@
+ include ':dataBinding:baseLibrary'
+ project(':dataBinding:baseLibrary').projectDir = new File("baseLibrary")
+-include ':dataBinding:compiler'
+-project(':dataBinding:compiler').projectDir = new File("compiler")
+-include ':dataBinding:compilationTests'
+-project(':dataBinding:compilationTests').projectDir = new File("compilationTests")
+ include ':dataBinding:compilerCommon'
+ project(':dataBinding:compilerCommon').projectDir = new File("compilerCommon")
+ 
+--- a/baseLibrary/build.gradle
++++ b/baseLibrary/build.gradle
+@@ -63,5 +63,4 @@
+ }
+ 
+ project.ext.pomName = 'Data Binding Base Library'
+-project.ext.pomDesc = 'Shared library between Data Binding runtime lib and compiler'
+-enablePublishing(this, true)
+\ No newline at end of file
++project.ext.pomDesc = 'Shared library between Data Binding runtime lib and compiler'
+\ No newline at end of file
+--- a/compilerCommon/build.gradle
++++ b/compilerCommon/build.gradle
+@@ -25,6 +25,7 @@
+             srcDir 'src/main/java'
+             srcDir 'src/main/xml-gen'
+             srcDir 'src/main/grammar-gen'
++            srcDir "${rootDir}/debian/antlr4"
+         }
+     }
+     test {
+@@ -63,7 +64,7 @@
+     // Using Java Properties appends date to the output which is bad for incremental compilation.
+     // Instead, we build it manually.
+     props.put("compilerCommon", project.version)
+-    props.put("compiler", rootProject.findProject("dataBinding:compiler").version)
++    props.put("compiler", project.version)
+     props.put("baseLibrary", rootProject.findProject("dataBinding:baseLibrary").version)
+     props.put("extensions", dataBindingConfig.extensionsVersion)
+     buildVersionFile.getParentFile().mkdirs()
+@@ -79,5 +80,4 @@
+ tasks['exportBuildVersions'].dependsOn('processResources')
+ 
+ project.ext.pomName = 'Data Binding Compiler Common'
+-project.ext.pomDesc = 'Common library that can be shared between different build tools'
+-enablePublishing(this, true)
++project.ext.pomDesc = 'Common library that can be shared between different build tools'
+\ No newline at end of file
