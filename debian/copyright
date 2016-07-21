@@ -2,7 +2,7 @@ Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0
 Upstream-Name: Data Binding Library
 Upstream-Contact: https://source.android.com/compatibility/contact-us.html
 Source: https://android.googlesource.com/platform/frameworks/data-binding
-Files-Excluded: *.zip *.jar
+Files-Excluded: *.zip *.jar *.aar
 
 Files: *
 Copyright: 2005-2016, The Android Open Source Project
