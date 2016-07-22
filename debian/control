@@ -9,7 +9,8 @@ Build-Depends: antlr4,
                gradle-debian-helper,
                libcommons-io-java,
                libguava-java,
-               libjuniversalchardet-java
+               libjuniversalchardet-java,
+               maven-repo-helper
 Standards-Version: 3.9.8
 Homepage: https://android.googlesource.com/platform/frameworks/data-binding
 Vcs-Git: https://anonscm.debian.org/git/android-tools/android-platform-frameworks-data-binding.git
