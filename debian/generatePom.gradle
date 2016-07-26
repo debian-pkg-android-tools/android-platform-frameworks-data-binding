@@ -2,35 +2,16 @@ apply plugin: 'maven'
 
 task generatePom {
   outputs.files "${buildDir}/${project.name}.pom"
+  assemble.dependsOn generatePom
+  clean.doLast {
+    delete "${buildDir}/${project.name}.pom"
+  }
   doFirst {
     pom {
       project {
-        url 'http://tools.android.com'
-        inceptionYear '2007'
         name pomName
         description pomDesc
-        licenses {
-          license {
-            name dataBindingConfig.licenseName
-            url dataBindingConfig.licenseUrl
-          }
-        }
-        scm {
-          url 'https://android.googlesource.com/platform/tools/base'
-          connection 'git://android.googlesource.com/platform/tools/base.git'
-        }
-        developers {
-          developer {
-            name 'The Android Open Source Project'
-          }
-        }
       }
     }.writeTo("${buildDir}/${project.name}.pom")
   }
 }
-
-clean.doLast {
-  delete "${buildDir}/${project.name}.pom"
-}
-
-assemble.dependsOn generatePom
