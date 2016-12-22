@@ -30,7 +30,7 @@ fun Expr.shouldLocalizeInCallbacks() = canBeEvaluatedToAVariable() && !resolvedT
 fun CallbackExprModel.localizeGlobalVariables(vararg ignore: Expr): KCode = kcode("// localize variables for thread safety") {
     // puts all variables in this model to local values.
     mExprMap.values.filter { it.shouldLocalizeInCallbacks() && !ignore.contains(it) }.forEach {
-        nl("// ${it.uniqueKey}")
+        nl("// ${it.toString()}")
         nl("${it.resolvedType.toJavaCode()} ${it.scopedName()} = ${if (it.isVariable()) it.fieldName else it.defaultValue};")
     }
 }
@@ -41,7 +41,9 @@ fun ExecutionPath.toCode(): KCode = kcode("") {
         // variables are read up top
         val localize = myExpr.shouldLocalizeInCallbacks() && !myExpr.isVariable()
         // if this is not a method call (or method call via field access, don't do anything
-        val eligible = localize || (myExpr is MethodCallExpr || (myExpr is FieldAccessExpr && myExpr.getter.type == Callable.Type.METHOD))
+        val eligible = localize || (myExpr is MethodCallExpr ||
+                (myExpr is FieldAccessExpr && myExpr.getter.type == Callable.Type.METHOD) ||
+                (myExpr is FieldAssignmentExpr))
         if (eligible) {
             val assign = if (localize) {
                 "${myExpr.scopedName()} = "

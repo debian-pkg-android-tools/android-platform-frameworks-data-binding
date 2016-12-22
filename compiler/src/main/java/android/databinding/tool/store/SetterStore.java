@@ -63,6 +63,9 @@ public class SetterStore {
                     if (o1.attributes.length != o2.attributes.length) {
                         return o2.attributes.length - o1.attributes.length;
                     }
+                    if (o1.mKey.attributeIndices.size() != o2.mKey.attributeIndices.size()) {
+                        return o2.mKey.attributeIndices.size() - o1.mKey.attributeIndices.size();
+                    }
                     ModelClass view1 = mClassAnalyzer.findClass(o1.mKey.viewType, null).erasure();
                     ModelClass view2 = mClassAnalyzer.findClass(o2.mKey.viewType, null).erasure();
                     if (!view1.equals(view2)) {
@@ -77,7 +80,7 @@ public class SetterStore {
                         // order by attribute name
                         Iterator<String> o1Keys = o1.mKey.attributeIndices.keySet().iterator();
                         Iterator<String> o2Keys = o2.mKey.attributeIndices.keySet().iterator();
-                        while (o1Keys.hasNext()) {
+                        while (o1Keys.hasNext() && o2Keys.hasNext()) {
                             String key1 = o1Keys.next();
                             String key2 = o2Keys.next();
                             int compare = key1.compareTo(key2);
@@ -319,9 +322,23 @@ public class SetterStore {
         L.d("STORE add multi-value BindingAdapter %d %s", attributes.length, bindingMethod);
         MultiValueAdapterKey key = new MultiValueAdapterKey(processingEnv, bindingMethod,
                 attributes, takesComponent, requireAll);
+        testRepeatedAttributes(key, bindingMethod);
         MethodDescription methodDescription = new MethodDescription(bindingMethod,
                 attributes.length, takesComponent);
         mStore.multiValueAdapters.put(key, methodDescription);
+    }
+
+    private static void testRepeatedAttributes(MultiValueAdapterKey key, ExecutableElement method) {
+        if (key.attributes.length != key.attributeIndices.size()) {
+            HashSet<String> names = new HashSet<>();
+            for (String attr : key.attributes) {
+                if (names.contains(attr)) {
+                    L.e(method, "Attribute \"" + attr + "\" is supplied multiple times in " +
+                            "BindingAdapter " + method.toString());
+                }
+                names.add(attr);
+            }
+        }
     }
 
     private static String[] stripAttributes(String[] attributes) {
@@ -714,7 +731,7 @@ public class SetterStore {
         if (viewType == null) {
             return null;
         } else if (viewType.isViewDataBinding()) {
-            return new ViewDataBindingGetterCall(attribute);
+            return new ViewDataBindingGetterCall(viewType, attribute);
         }
 
         attribute = stripNamespace(attribute);
@@ -758,11 +775,11 @@ public class SetterStore {
                                                 viewType.getCanonicalName());
                                     } else {
                                         bestMethod.call = new AdapterGetter(inverseDescription,
-                                                setters.get(0));
+                                                setters.get(0), key.valueType);
                                     }
                                 } else {
                                     bestMethod.call = new AdapterGetter(inverseDescription,
-                                            eventCall);
+                                            eventCall, key.valueType);
                                 }
                             }
 
@@ -1271,6 +1288,7 @@ public class SetterStore {
     }
 
     private static class IntermediateV2 extends IntermediateV1 {
+        private static final long serialVersionUID = 0xA45C2EB637E35C07L;
         public final HashMap<String, HashMap<AccessorKey, InverseDescription>> inverseAdapters =
                 new HashMap<String, HashMap<AccessorKey, InverseDescription>>();
         public final HashMap<String, HashMap<String, InverseDescription>> inverseMethods =
@@ -1635,6 +1653,8 @@ public class SetterStore {
     public interface BindingGetterCall {
         String toJava(String componentExpression, String viewExpression);
 
+        String getGetterType();
+
         int getMinApi();
 
         String getBindingAdapterInstanceClass();
@@ -1650,17 +1670,24 @@ public class SetterStore {
         private final String mGetter;
         private final BindingSetterCall mEventSetter;
         private final String mAttribute;
+        private final ModelClass mBindingClass;
 
-        public ViewDataBindingGetterCall(String attribute) {
+        public ViewDataBindingGetterCall(ModelClass bindingClass, String attribute) {
             final int colonIndex = attribute.indexOf(':');
             mAttribute = attribute.substring(colonIndex + 1);
             mGetter = "get" + StringUtils.capitalize(mAttribute);
             mEventSetter = new ViewDataBindingEventSetter();
+            mBindingClass = bindingClass;
         }
 
         @Override
         public String toJava(String componentExpression, String viewExpression) {
             return viewExpression + "." + mGetter + "()";
+        }
+
+        @Override
+        public String getGetterType() {
+            return mBindingClass.findInstanceGetter(mGetter).getReturnType().toJavaCode();
         }
 
         @Override
@@ -1716,6 +1743,11 @@ public class SetterStore {
         }
 
         @Override
+        public String getGetterType() {
+            return mMethod.getReturnType().toJavaCode();
+        }
+
+        @Override
         public int getMinApi() {
             return mMethod.getMinApi();
         }
@@ -1734,10 +1766,18 @@ public class SetterStore {
         private final InverseDescription mInverseDescription;
         private String mBindingAdapterCall;
         private final BindingSetterCall mEventCall;
+        private final String mGetterType;
 
-        public AdapterGetter(InverseDescription description, BindingSetterCall eventCall) {
+        public AdapterGetter(InverseDescription description, BindingSetterCall eventCall,
+                String getterType) {
             mInverseDescription = description;
             mEventCall = eventCall;
+            mGetterType = getterType;
+        }
+
+        @Override
+        public String getGetterType() {
+            return mGetterType;
         }
 
         @Override

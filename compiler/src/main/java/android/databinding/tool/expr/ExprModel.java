@@ -17,8 +17,8 @@
 package android.databinding.tool.expr;
 
 import android.databinding.tool.BindingTarget;
-import android.databinding.tool.InverseBinding;
 import android.databinding.tool.CallbackWrapper;
+import android.databinding.tool.InverseBinding;
 import android.databinding.tool.reflection.ModelAnalyzer;
 import android.databinding.tool.reflection.ModelClass;
 import android.databinding.tool.reflection.ModelMethod;
@@ -27,8 +27,6 @@ import android.databinding.tool.util.L;
 import android.databinding.tool.util.Preconditions;
 import android.databinding.tool.writer.ExprModelExt;
 import android.databinding.tool.writer.FlagSet;
-
-import com.google.common.collect.Maps;
 
 import org.antlr.v4.runtime.ParserRuleContext;
 import org.jetbrains.annotations.Nullable;
@@ -172,7 +170,11 @@ public class ExprModel {
     }
 
     public FieldAccessExpr observableField(Expr parent, String name) {
-        return register(new FieldAccessExpr(parent, name, true));
+        return register(new ObservableFieldExpr(parent, name));
+    }
+
+    public MethodReferenceExpr methodReference(Expr parent, String name) {
+        return register(new MethodReferenceExpr(parent, name));
     }
 
     public SymbolExpr symbol(String text, Class type) {
@@ -271,13 +273,9 @@ public class ExprModel {
         return register(new UnaryExpr(op, expr));
     }
 
-    public Expr group(Expr grouped) {
-        return register(new GroupExpr(grouped));
-    }
-
-    public Expr resourceExpr(String packageName, String resourceType, String resourceName,
-            List<Expr> args) {
-        return register(new ResourceExpr(packageName, resourceType, resourceName, args));
+    public Expr resourceExpr(BindingTarget target, String packageName, String resourceType,
+            String resourceName, List<Expr> args) {
+        return register(new ResourceExpr(target, packageName, resourceType, resourceName, args));
     }
 
     public Expr bracketExpr(Expr variableExpr, Expr argExpr) {
@@ -340,7 +338,7 @@ public class ExprModel {
     public void removeExpr(Expr expr) {
         Preconditions.check(!mSealed, "Can't modify the expression list after sealing the model.");
         mBindingExpressions.remove(expr);
-        mExprMap.remove(expr.computeUniqueKey());
+        mExprMap.remove(expr.getUniqueKey());
     }
 
     public List<Expr> getObservables() {
@@ -408,7 +406,7 @@ public class ExprModel {
         for (Expr expr : mExprMap.values()) {
             if (expr instanceof FieldAccessExpr) {
                 FieldAccessExpr fieldAccessExpr = (FieldAccessExpr) expr;
-                if (fieldAccessExpr.getChild() instanceof ViewFieldExpr) {
+                if (fieldAccessExpr.getTarget() instanceof ViewFieldExpr) {
                     flagMapping.add(fieldAccessExpr.getUniqueKey());
                     fieldAccessExpr.setId(counter++);
                 }
@@ -591,15 +589,17 @@ public class ExprModel {
                 }
             }
         }
-        for (Expr partialRead : markedSomeFlagsAsRead) {
-            // even if all paths are not satisfied, we can elevate certain conditional dependencies
-            // if all of their paths are satisfied.
-            for (Dependency dependency : partialRead.getDependants()) {
-                Expr dependant = dependency.getDependant();
-                if (dependant.isConditional() && dependant.getAllCalculationPaths()
-                        .areAllPathsSatisfied(partialRead.mReadSoFar)) {
-                    if (dependant.considerElevatingConditionals(partialRead)) {
-                        elevated = true;
+        if (!elevated) {
+            for (Expr partialRead : markedSomeFlagsAsRead) {
+                // even if all paths are not satisfied, we can elevate certain conditional
+                // dependencies if all of their paths are satisfied.
+                for (Dependency dependency : partialRead.getDependants()) {
+                    Expr dependant = dependency.getDependant();
+                    if (dependant.isConditional() && dependant.getAllCalculationPaths()
+                            .areAllPathsSatisfied(partialRead.mReadSoFar)) {
+                        if (dependant.considerElevatingConditionals(partialRead)) {
+                            elevated = true;
+                        }
                     }
                 }
             }
@@ -688,6 +688,10 @@ public class ExprModel {
         return register(new ListenerExpr(expression, name, listenerType, listenerMethod));
     }
 
+    public FieldAssignmentExpr assignment(Expr target, String name, Expr value) {
+        return register(new FieldAssignmentExpr(target, name, value));
+    }
+
     public Map<String, CallbackWrapper> getCallbackWrappers() {
         return mCallbackWrappers;
     }
@@ -702,7 +706,7 @@ public class ExprModel {
         return wrapper;
     }
 
-    public Expr lambdaExpr(Expr expr, CallbackExprModel callbackExprModel) {
+    public LambdaExpr lambdaExpr(Expr expr, CallbackExprModel callbackExprModel) {
         return register(new LambdaExpr(expr, callbackExprModel));
     }
 
