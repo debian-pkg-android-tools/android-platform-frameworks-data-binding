@@ -1,3 +1,11 @@
+android-platform-frameworks-data-binding (2.2.2-1) unstable; urgency=medium
+
+  [Hans-Christoph Steiner]
+  * New upstream version
+  * Team upload
+
+ -- Kai-Chung Yan <seamlikok@gmail.com>  Thu, 22 Dec 2016 22:22:18 +0100
+
 android-platform-frameworks-data-binding (2.0.0-1) unstable; urgency=medium
 
   * Initial release. (Closes: #832108)
